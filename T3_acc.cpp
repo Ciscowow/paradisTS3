@@ -42,13 +42,16 @@ int main() {
 
     auto startTime = chrono::high_resolution_clock::now();
 
-    #pragma acc parallel loop copy(pixelData[0:pixelData.size()])
-    for (int i = 0; i < pixelData.size(); i += 3) {
-        unsigned char b = pixelData[i];
-        unsigned char g = pixelData[i + 1];
-        unsigned char r = pixelData[i + 2];
-        unsigned char gray = RGBtoGRAY(r, g, b);
-        pixelData[i] = pixelData[i + 1] = pixelData[i + 2] = gray;
+    #pragma acc data copy(pixelData[0:pixelData.size()])
+    {
+        #pragma acc parallel loop gang vector
+        for (int i = 0; i < pixelData.size(); i += 3) {
+            unsigned char b = pixelData[i];
+            unsigned char g = pixelData[i + 1];
+            unsigned char r = pixelData[i + 2];
+            unsigned char gray = RGBtoGRAY(r, g, b);
+            pixelData[i] = pixelData[i + 1] = pixelData[i + 2] = gray;
+        }
     }
 
     auto endTime = chrono::high_resolution_clock::now();
