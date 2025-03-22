@@ -11,8 +11,8 @@ unsigned char RGBtoGRAY(unsigned char r, unsigned char g, unsigned char b) {
 }
 
 int main() {
-    string imagePath = "rgb_image.bmp";  
-    string outputPath = "output_grayscale/Grayscale_image_sequential.bmp";
+    string imagePath = "./rgb_image.bmp";  
+    string outputPath = "./Grayscale_image_sequential.bmp";
 
     // Open the image file
     ifstream imageFile(imagePath, ios::binary);
