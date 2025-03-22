@@ -17,7 +17,7 @@ int main() {
     // Open the image file
     ifstream imageFile(imagePath, ios::binary);
     if (!imageFile) {
-        cerr << "❌ Error: Could not open the image file!" << endl;
+        cerr << "Error: Could not open the image file!" << endl;
         return -1;
     }
 
@@ -32,7 +32,7 @@ int main() {
     short bitDepth = *reinterpret_cast<short*>(&dibHeader[14]);
 
     if (bitDepth != 24) {
-        cerr << "❌ Error: Only 24-bit BMP files are supported!" << endl;
+        cerr << "Error: Only 24-bit BMP files are supported!" << endl;
         return -1;
     }
 
@@ -57,12 +57,12 @@ int main() {
     // End measuring time
     auto endTime = chrono::high_resolution_clock::now();
     auto totalTime = chrono::duration_cast<chrono::milliseconds>(endTime - startTime);
-    cout << "✅ Total time: " << totalTime.count() << " ms (Sequential)" << endl;
+    cout << "Total time: " << totalTime.count() << " ms (Sequential)" << endl;
 
     // Write grayscale image
     ofstream outputFile(outputPath, ios::binary);
     if (!outputFile) {
-        cerr << "❌ Error: Could not save the grayscale image!" << endl;
+        cerr << "Error: Could not save the grayscale image!" << endl;
         return -1;
     }
 
@@ -71,6 +71,6 @@ int main() {
     outputFile.write(reinterpret_cast<const char*>(pixelData.data()), pixelData.size());
     outputFile.close();
 
-    cout << "✅ Grayscale image saved to: " << outputPath << endl;
+    cout << "Grayscale image saved to: " << outputPath << endl;
     return 0;
 }
