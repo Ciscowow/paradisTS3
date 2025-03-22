@@ -35,7 +35,7 @@ int main() {
         return -1;
     }
 
-    int rowSize = (width * 3 + 3) & ~3;
+    int rowSize = (width * 3 + 3) & ~3; // Ensure rowSize is 4-byte aligned
     vector<unsigned char> pixelData(rowSize * abs(height));
     imageFile.read(reinterpret_cast<char*>(pixelData.data()), pixelData.size());
     imageFile.close();
@@ -47,8 +47,8 @@ int main() {
         #pragma acc parallel loop collapse(2) gang vector
         for (int y = 0; y < abs(height); ++y) {
             for (int x = 0; x < width; ++x) {
-                int i = y * rowSize + x * 3;  // Correct row addressing with padding
-                if (i + 2 < pixelData.size()) {  // Prevent out-of-bounds access
+                int i = y * rowSize + x * 3;  // Adjust for padding
+                if (i >= 0 && i + 2 < pixelData.size()) {  // Strict bounds check
                     unsigned char b = pixelData[i];
                     unsigned char g = pixelData[i + 1];
                     unsigned char r = pixelData[i + 2];
