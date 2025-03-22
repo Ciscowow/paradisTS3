@@ -1,80 +1,64 @@
 #include <iostream>
-#include <fstream>
 #include <vector>
 #include <chrono>
-#include <openacc.h>
+#define STB_IMAGE_IMPLEMENTATION
+#include "stb_image.h"
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#include "stb_image_write.h"
 
 using namespace std;
+using namespace std::chrono;
 
 // Convert RGB to Grayscale
 unsigned char RGBtoGRAY(unsigned char r, unsigned char g, unsigned char b) {
-    return static_cast<unsigned char>(0.299 * r + 0.587 * g + 0.114 * b);
+    return static_cast<unsigned char>(0.299 * r + 0.587 * g + 0.114 * b);  // Standard grayscale conversion
 }
 
 int main() {
-    string imagePath = "./rgb_image.bmp";
-    string outputPath = "./Grayscale_image_parallel.bmp";
+    string imagePath = "./rgb_image.bmp";  // Path to the input image
+    string outputPath = "./Grayscale_image_parallel.bmp";  // Path to save the grayscale image
 
-    ifstream imageFile(imagePath, ios::binary);
-    if (!imageFile) {
-        cerr << "Error: Could not open the image file!" << endl;
-        return -1;
+    int width, height, channels;
+
+    // Load the image
+    unsigned char* image = stbi_load(imagePath.c_str(), &width, &height, &channels, 3);
+    if (!image) {
+        cerr << "Error: Could not load image!" << endl;
+        return 1;
     }
 
-    vector<unsigned char> fileHeader(14);
-    vector<unsigned char> dibHeader(40);
-    imageFile.read(reinterpret_cast<char*>(fileHeader.data()), 14);
-    imageFile.read(reinterpret_cast<char*>(dibHeader.data()), 40);
+    // Create a vector to hold grayscale pixel data
+    vector<unsigned char> grayImage(width * height);
 
-    int width = *reinterpret_cast<int*>(&dibHeader[4]);
-    int height = *reinterpret_cast<int*>(&dibHeader[8]);
-    short bitDepth = *reinterpret_cast<short*>(&dibHeader[14]);
+    // Start measuring time
+    auto startTime = high_resolution_clock::now();
 
-    if (bitDepth != 24) {
-        cerr << "Error: Only 24-bit BMP files are supported!" << endl;
-        return -1;
+    // Convert each pixel to grayscale in parallel
+    #pragma omp parallel for
+    for (int i = 0; i < width * height; i++) {
+        int index = i * 3;
+        unsigned char r = image[index];
+        unsigned char g = image[index + 1];
+        unsigned char b = image[index + 2];
+        unsigned char gray = RGBtoGRAY(r, g, b);
+        grayImage[i] = gray;
     }
 
-    int rowSize = (width * 3 + 3) & ~3; // Ensure rowSize is 4-byte aligned
-    vector<unsigned char> pixelData(rowSize * abs(height));
-    imageFile.read(reinterpret_cast<char*>(pixelData.data()), pixelData.size());
-    imageFile.close();
-
-    auto startTime = chrono::high_resolution_clock::now();
-
-    #pragma acc data copy(pixelData[0:pixelData.size()])
-    {
-        #pragma acc parallel loop collapse(2) gang vector
-        for (int y = 0; y < abs(height); ++y) {
-            for (int x = 0; x < width; ++x) {
-                int i = y * rowSize + x * 3;  // Adjust for padding
-                if (i >= 0 && i + 2 < pixelData.size()) {  // Strict bounds check
-                    unsigned char b = pixelData[i];
-                    unsigned char g = pixelData[i + 1];
-                    unsigned char r = pixelData[i + 2];
-                    unsigned char gray = RGBtoGRAY(r, g, b);
-                    pixelData[i] = pixelData[i + 1] = pixelData[i + 2] = gray;
-                }
-            }
-        }
-        #pragma acc wait  // Ensure computation finishes before proceeding
-    }
-
-    auto endTime = chrono::high_resolution_clock::now();
-    auto totalTime = chrono::duration_cast<chrono::milliseconds>(endTime - startTime);
+    // End measuring time
+    auto endTime = high_resolution_clock::now();
+    auto totalTime = duration_cast<chrono::milliseconds>(endTime - startTime);
     cout << "Total time: " << totalTime.count() << " ms (Parallel)" << endl;
 
-    ofstream outputFile(outputPath, ios::binary);
-    if (!outputFile) {
-        cerr << "Error: Could not save the grayscale image!" << endl;
-        return -1;
+    // Save the grayscale image
+    if (!stbi_write_bmp(outputPath.c_str(), width, height, 1, grayImage.data())) {
+        cerr << "Error: Could not save grayscale image!" << endl;
+        stbi_image_free(image);
+        return 1;
     }
 
-    outputFile.write(reinterpret_cast<const char*>(fileHeader.data()), 14);
-    outputFile.write(reinterpret_cast<const char*>(dibHeader.data()), 40);
-    outputFile.write(reinterpret_cast<const char*>(pixelData.data()), pixelData.size());
-    outputFile.close();
+    stbi_image_free(image);
 
-    cout << "Grayscale image saved to: " << outputPath << endl;
+    cout << "Grayscale image saved as " << outputPath << endl;
+
     return 0;
 }
