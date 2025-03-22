@@ -48,13 +48,16 @@ int main() {
         for (int y = 0; y < abs(height); ++y) {
             for (int x = 0; x < width; ++x) {
                 int i = y * rowSize + x * 3;  // Correct row addressing with padding
-                unsigned char b = pixelData[i];
-                unsigned char g = pixelData[i + 1];
-                unsigned char r = pixelData[i + 2];
-                unsigned char gray = RGBtoGRAY(r, g, b);
-                pixelData[i] = pixelData[i + 1] = pixelData[i + 2] = gray;
+                if (i + 2 < pixelData.size()) {  // Prevent out-of-bounds access
+                    unsigned char b = pixelData[i];
+                    unsigned char g = pixelData[i + 1];
+                    unsigned char r = pixelData[i + 2];
+                    unsigned char gray = RGBtoGRAY(r, g, b);
+                    pixelData[i] = pixelData[i + 1] = pixelData[i + 2] = gray;
+                }
             }
         }
+        #pragma acc wait  // Ensure computation finishes before proceeding
     }
 
     auto endTime = chrono::high_resolution_clock::now();
