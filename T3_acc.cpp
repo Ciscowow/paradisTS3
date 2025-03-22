@@ -6,8 +6,8 @@
 
 using namespace std;
 
-const string imagePath = "rgb_image.bmp";  // Set input file path
-const string outputPath = "grayscale_image_parallel.bmp";  // Set output file path
+const string imagePath = "rgb_image.bmp";
+const string outputPath = "grayscale_image_parallel.bmp";
 
 // Convert RGB to Grayscale using the standard formula
 unsigned char RGBtoGRAY(unsigned char r, unsigned char g, unsigned char b) {
@@ -35,27 +35,30 @@ int main() {
         return -1;
     }
 
-    int rowSize = (width * 3 + 3) & ~3;
-    vector<unsigned char> pixelData(rowSize * abs(height));
+    int rowSize = (width * 3 + 3) & ~3;  // Ensure row alignment
+    int dataSize = rowSize * abs(height);
+    vector<unsigned char> pixelData(dataSize);
 
     imageFile.read(reinterpret_cast<char*>(pixelData.data()), pixelData.size());
     imageFile.close();
 
     auto startTime = chrono::high_resolution_clock::now();
 
-    // Allocate and copy data to the GPU
-    #pragma acc enter data copyin(pixelData[0:pixelData.size()])
-
-    #pragma acc parallel loop present(pixelData[0:pixelData.size()])
-    for (int i = 0; i < pixelData.size(); i += 3) {
-        unsigned char b = pixelData[i];
-        unsigned char g = pixelData[i + 1];
-        unsigned char r = pixelData[i + 2];
-        unsigned char gray = RGBtoGRAY(r, g, b);
-        pixelData[i] = pixelData[i + 1] = pixelData[i + 2] = gray;
+    // Allocate memory on GPU and copy pixelData
+    #pragma acc data copy(pixelData[0:dataSize])
+    {
+        #pragma acc parallel loop
+        for (int row = 0; row < abs(height); row++) {
+            for (int col = 0; col < width; col++) {
+                int i = row * rowSize + col * 3;  // Corrected indexing
+                unsigned char b = pixelData[i];
+                unsigned char g = pixelData[i + 1];
+                unsigned char r = pixelData[i + 2];
+                unsigned char gray = RGBtoGRAY(r, g, b);
+                pixelData[i] = pixelData[i + 1] = pixelData[i + 2] = gray;
+            }
+        }
     }
-
-    #pragma acc exit data copyout(pixelData[0:pixelData.size()])
 
     auto endTime = chrono::high_resolution_clock::now();
     auto totalTime = chrono::duration_cast<chrono::milliseconds>(endTime - startTime);
