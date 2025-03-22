@@ -2,18 +2,18 @@
 #include <fstream>
 #include <vector>
 #include <chrono> 
-#include <openacc.h>  // Include OpenACC header
+#include <openacc.h>  
+#include <filesystem> // Required for path manipulation
 
 using namespace std;
-
-// Convert RGB to Grayscale
-unsigned char RGBtoGRAY(unsigned char r, unsigned char g, unsigned char b) {
-    return static_cast<unsigned char>(0.299 * r + 0.587 * g + 0.114 * b);
-}
+namespace fs = filesystem; // Alias for easier usage
 
 int main() {
-    string imagePath = "/home/darren/paradisTS3/rgb_image.bmp";
-    string outputPath = "/home/darren/paradisTS3/Grayscale_image_OpenACC.bmp";
+    string imagePath = "rgb_image.bmp";  // Use relative path (same folder)
+    
+    // Generate output file name
+    fs::path inputPath(imagePath);
+    string outputPath = inputPath.stem().string() + "_grayscale.bmp";
 
     // Open the image file
     ifstream imageFile(imagePath, ios::binary);
@@ -53,17 +53,15 @@ int main() {
     int dataSize = pixelData.size();
     #pragma acc parallel loop copy(pixelData[0:dataSize])
     for (int i = 0; i < dataSize; i += 3) {
-        unsigned char b = pixelData[i];     // BMP stores as BGR
+        unsigned char b = pixelData[i];     
         unsigned char g = pixelData[i + 1];
         unsigned char r = pixelData[i + 2];
-        unsigned char gray = RGBtoGRAY(r, g, b);
+        unsigned char gray = static_cast<unsigned char>(0.299 * r + 0.587 * g + 0.114 * b);
         pixelData[i] = pixelData[i + 1] = pixelData[i + 2] = gray;
     }
 
     // End measuring time
     auto endTime = chrono::high_resolution_clock::now();
-    
-    // Compute execution time
     auto totalTime = chrono::duration_cast<chrono::milliseconds>(endTime - startTime);
     cout << "Total_time = " << totalTime.count() << " ms (OpenACC GPU)" << endl;
 
