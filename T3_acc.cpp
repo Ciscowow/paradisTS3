@@ -1,20 +1,20 @@
 #include <iostream>
 #include <fstream>
 #include <vector>
-#include <chrono> 
+#include <chrono>
 #include <openacc.h>
 
 using namespace std;
 
-const string imagePath = "rgb_image.bmp";
-const string outputPath = "grayscale_image_parallel.bmp";
-
-// Convert RGB to Grayscale using the standard formula
+// Convert RGB to Grayscale
 unsigned char RGBtoGRAY(unsigned char r, unsigned char g, unsigned char b) {
     return static_cast<unsigned char>(0.299 * r + 0.587 * g + 0.114 * b);
 }
 
 int main() {
+    string imagePath = "./rgb_image.bmp";
+    string outputPath = "./Grayscale_image_parallel.bmp";
+
     ifstream imageFile(imagePath, ios::binary);
     if (!imageFile) {
         cerr << "Error: Could not open the image file!" << endl;
@@ -35,22 +35,19 @@ int main() {
         return -1;
     }
 
-    int rowSize = (width * 3 + 3) & ~3;  // Ensure row alignment
-    int dataSize = rowSize * abs(height);
-    vector<unsigned char> pixelData(dataSize);
-
+    int rowSize = (width * 3 + 3) & ~3;
+    vector<unsigned char> pixelData(rowSize * abs(height));
     imageFile.read(reinterpret_cast<char*>(pixelData.data()), pixelData.size());
     imageFile.close();
 
     auto startTime = chrono::high_resolution_clock::now();
 
-    // Allocate memory on GPU and copy pixelData
-    #pragma acc data copy(pixelData[0:dataSize])
+    #pragma acc data copy(pixelData[0:pixelData.size()])
     {
-        #pragma acc parallel loop
-        for (int row = 0; row < abs(height); row++) {
-            for (int col = 0; col < width; col++) {
-                int i = row * rowSize + col * 3;  // Corrected indexing
+        #pragma acc parallel loop collapse(2) gang vector
+        for (int y = 0; y < abs(height); ++y) {
+            for (int x = 0; x < width; ++x) {
+                int i = y * rowSize + x * 3;  // Correct row addressing with padding
                 unsigned char b = pixelData[i];
                 unsigned char g = pixelData[i + 1];
                 unsigned char r = pixelData[i + 2];
@@ -62,7 +59,7 @@ int main() {
 
     auto endTime = chrono::high_resolution_clock::now();
     auto totalTime = chrono::duration_cast<chrono::milliseconds>(endTime - startTime);
-    cout << "Total_time = " << totalTime.count() << " ms (OpenACC Parallelized)" << endl;
+    cout << "Total time: " << totalTime.count() << " ms (Parallel)" << endl;
 
     ofstream outputFile(outputPath, ios::binary);
     if (!outputFile) {
