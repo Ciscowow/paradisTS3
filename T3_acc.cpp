@@ -1,31 +1,29 @@
 #include <iostream>
 #include <fstream>
 #include <vector>
-#include <chrono>
-#include <openacc.h>
-#include <filesystem>
+#include <chrono> 
+#include <openacc.h>  
+#include <filesystem> 
 
 using namespace std;
-namespace fs = filesystem;
+namespace fs = filesystem; 
 
 int main() {
-    string imagePath = "/home/cisco/paradisTS3/rgb_image.bmp";  
-    string outputPath = "/home/cisco/paradisTS3/Grayscale_image_acc.bmp";
+    string imagePath = "rgb_image.bmp";  
+    fs::path inputPath(imagePath);
+    string outputPath = inputPath.stem().string() + "_grayscale.bmp";
 
-    // Open the image file
     ifstream imageFile(imagePath, ios::binary);
     if (!imageFile) {
         cerr << "Error: Could not open the image file!" << endl;
         return -1;
     }
 
-    // Read BMP headers
     vector<unsigned char> fileHeader(14);
     vector<unsigned char> dibHeader(40);
     imageFile.read(reinterpret_cast<char*>(fileHeader.data()), 14);
     imageFile.read(reinterpret_cast<char*>(dibHeader.data()), 40);
 
-    // Extract image dimensions
     int width = *reinterpret_cast<int*>(&dibHeader[4]);
     int height = *reinterpret_cast<int*>(&dibHeader[8]);
     short bitDepth = *reinterpret_cast<short*>(&dibHeader[14]);
@@ -35,29 +33,19 @@ int main() {
         return -1;
     }
 
-    // Row padding calculation
     int rowSize = (width * 3 + 3) & ~3;
-    int dataSize = rowSize * abs(height);
-    vector<unsigned char> pixelData(dataSize);
+    vector<unsigned char> pixelData(rowSize * abs(height));
 
-    // Read pixel data
-    imageFile.read(reinterpret_cast<char*>(pixelData.data()), dataSize);
+    imageFile.read(reinterpret_cast<char*>(pixelData.data()), pixelData.size());
     imageFile.close();
 
-    // Validate data size
-    if (dataSize <= 0) {
-        cerr << "Error: Invalid data size!" << endl;
-        return -1;
-    }
-
-    // Start measuring time
     auto startTime = chrono::high_resolution_clock::now();
+    int dataSize = pixelData.size();
 
-    // 🚀 **Parallel GPU Execution with OpenACC**
-    #pragma acc data copy(pixelData[0:dataSize])
+    #pragma acc parallel 
     {
-        #pragma acc parallel loop 
-        for (int i = 0; i < dataSize - 2; i += 3) {
+        #pragma acc loop independent
+        for (int i = 0; i < dataSize; i += 3) {
             unsigned char b = pixelData[i];     
             unsigned char g = pixelData[i + 1];
             unsigned char r = pixelData[i + 2];
@@ -66,12 +54,10 @@ int main() {
         }
     }
 
-    // End measuring time
     auto endTime = chrono::high_resolution_clock::now();
     auto totalTime = chrono::duration_cast<chrono::milliseconds>(endTime - startTime);
     cout << "Total_time = " << totalTime.count() << " ms (OpenACC GPU)" << endl;
 
-    // Write the grayscale image
     ofstream outputFile(outputPath, ios::binary);
     if (!outputFile) {
         cerr << "Error: Could not save the grayscale image!" << endl;
@@ -80,7 +66,7 @@ int main() {
 
     outputFile.write(reinterpret_cast<const char*>(fileHeader.data()), 14);
     outputFile.write(reinterpret_cast<const char*>(dibHeader.data()), 40);
-    outputFile.write(reinterpret_cast<const char*>(pixelData.data()), dataSize);
+    outputFile.write(reinterpret_cast<const char*>(pixelData.data()), pixelData.size());
     outputFile.close();
 
     cout << "Grayscale image saved to: " << outputPath << endl;
