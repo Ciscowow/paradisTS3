@@ -2,7 +2,7 @@
 #include <fstream>
 #include <cstdint>
 #include <chrono>
-#include <cstdlib>  
+#include <cstdlib>
 
 using namespace std;
 
@@ -28,7 +28,7 @@ int main() {
 
     in.seekg(0, ios::end);
     size_t fileSize = in.tellg();
-    in.seekg(54, ios::beg); 
+    in.seekg(54, ios::beg);  
 
     size_t pixelCount = (fileSize - 54) / sizeof(Pixel);
     Pixel* pixels = (Pixel*)malloc(pixelCount * sizeof(Pixel));
@@ -39,7 +39,7 @@ int main() {
     }
 
     in.read(reinterpret_cast<char*>(pixels), pixelCount * sizeof(Pixel));
-    in.close();
+    in.close();  
 
     auto start = chrono::high_resolution_clock::now();
 
@@ -49,14 +49,14 @@ int main() {
     }
 
     auto end = chrono::high_resolution_clock::now();
-    auto duration = chrono::duration_cast<chrono::microseconds>(end - start);  
+    auto duration = chrono::duration_cast<chrono::microseconds>(end - start);
 
     out.write(reinterpret_cast<char*>(pixels), pixelCount * sizeof(Pixel));
-    out.close();
+    out.close();  
 
     free(pixels);
 
-    cout << "Total time: " << duration.count() << " microseconds (Sequential)" << endl;
+    cout << "Grayscale conversion time: " << duration.count() << " microseconds (Sequential)" << endl;
     cout << "Grayscale image saved as " << outfile << endl;
 
     return 0;
