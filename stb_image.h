@@ -4273,24 +4273,24 @@ stbi_inline static int stbi__zhuffman_decode(stbi__zbuf *a, stbi__zhuffman *z)
 static int stbi__zexpand(stbi__zbuf *z, char *zout, int n)  // need to make room for n bytes
 {
    char *q;
-   unsigned int cur, limit, old_limit;
+   unsigned int cur, limit;
    z->zout = zout;
-   if (!z->z_expandable) return stbi__err("output buffer limit","Corrupt PNG");
-   cur   = (unsigned int) (z->zout - z->zout_start);
-   limit = old_limit = (unsigned) (z->zout_end - z->zout_start);
-   if (UINT_MAX - cur < (unsigned) n) return stbi__err("outofmem", "Out of memory");
+   if (!z->z_expandable) return stbi__err("output buffer limit", "Corrupt PNG");
+   cur   = (unsigned int)(z->zout - z->zout_start);
+   limit = (unsigned)(z->zout_end - z->zout_start);
+   if (UINT_MAX - cur < (unsigned)n) return stbi__err("outofmem", "Out of memory");
    while (cur + n > limit) {
-      if(limit > UINT_MAX / 2) return stbi__err("outofmem", "Out of memory");
+      if (limit > UINT_MAX / 2) return stbi__err("outofmem", "Out of memory");
       limit *= 2;
    }
-   q = (char *) STBI_REALLOC_SIZED(z->zout_start, old_limit, limit);
-   STBI_NOTUSED(old_limit);
+   q = (char *)STBI_REALLOC_SIZED(z->zout_start, limit / 2, limit); // No need to use old_limit
    if (q == NULL) return stbi__err("outofmem", "Out of memory");
    z->zout_start = q;
-   z->zout       = q + cur;
-   z->zout_end   = q + limit;
+   z->zout = q + cur;
+   z->zout_end = q + limit;
    return 1;
 }
+
 
 static const int stbi__zlength_base[31] = {
    3,4,5,6,7,8,9,10,11,13,
@@ -5169,32 +5169,31 @@ static int stbi__parse_png_file(stbi__png *z, int scan, int req_comp)
             }
             break;
          }
-
          case STBI__PNG_TYPE('I','D','A','T'): {
-            if (first) return stbi__err("first not IHDR", "Corrupt PNG");
-            if (pal_img_n && !pal_len) return stbi__err("no PLTE","Corrupt PNG");
-            if (scan == STBI__SCAN_header) {
-               // header scan definitely stops at first IDAT
-               if (pal_img_n)
-                  s->img_n = pal_img_n;
-               return 1;
-            }
-            if (c.length > (1u << 30)) return stbi__err("IDAT size limit", "IDAT section larger than 2^30 bytes");
-            if ((int)(ioff + c.length) < (int)ioff) return 0;
-            if (ioff + c.length > idata_limit) {
-               stbi__uint32 idata_limit_old = idata_limit;
-               stbi_uc *p;
-               if (idata_limit == 0) idata_limit = c.length > 4096 ? c.length : 4096;
-               while (ioff + c.length > idata_limit)
-                  idata_limit *= 2;
-               STBI_NOTUSED(idata_limit_old);
-               p = (stbi_uc *) STBI_REALLOC_SIZED(z->idata, idata_limit_old, idata_limit); if (p == NULL) return stbi__err("outofmem", "Out of memory");
-               z->idata = p;
-            }
-            if (!stbi__getn(s, z->idata+ioff,c.length)) return stbi__err("outofdata","Corrupt PNG");
-            ioff += c.length;
-            break;
-         }
+    if (first) return stbi__err("first not IHDR", "Corrupt PNG");
+    if (pal_img_n && !pal_len) return stbi__err("no PLTE", "Corrupt PNG");
+    if (scan == STBI__SCAN_header) {
+        // header scan definitely stops at first IDAT
+        if (pal_img_n)
+            s->img_n = pal_img_n;
+        return 1;
+    }
+    if (c.length > (1u << 30)) return stbi__err("IDAT size limit", "IDAT section larger than 2^30 bytes");
+    if ((int)(ioff + c.length) < (int)ioff) return 0;
+    if (ioff + c.length > idata_limit) {
+        stbi_uc *p;
+        if (idata_limit == 0) idata_limit = c.length > 4096 ? c.length : 4096;
+        while (ioff + c.length > idata_limit)
+            idata_limit *= 2;
+        p = (stbi_uc *) STBI_REALLOC_SIZED(z->idata, idata_limit / 2, idata_limit); // No need for old_limit
+        if (p == NULL) return stbi__err("outofmem", "Out of memory");
+        z->idata = p;
+    }
+    if (!stbi__getn(s, z->idata + ioff, c.length)) return stbi__err("outofdata", "Corrupt PNG");
+    ioff += c.length;
+    break;
+}
+
 
          case STBI__PNG_TYPE('I','E','N','D'): {
             stbi__uint32 raw_len, bpl;
@@ -7028,6 +7027,7 @@ static void *stbi__load_gif_main(stbi__context *s, int **delays, int *x, int *y,
             }
          }
       } while (u != 0);
+      	
 
       // free temp buffer;
       STBI_FREE(g.out);
