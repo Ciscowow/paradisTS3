@@ -1,68 +1,63 @@
 #include <iostream>
 #include <fstream>
-#include <vector>
-#include <chrono> 
+#include <cstdint>
+#include <chrono>
+#include <cstdlib>  
 
 using namespace std;
-unsigned char RGBtoGRAY(unsigned char r, unsigned char g, unsigned char b) {
-    return static_cast<unsigned char>(0.299 * r + 0.587 * g + 0.114 * b);
-}
+
+struct Pixel {
+    unsigned char b, g, r;
+};
 
 int main() {
-    string imagePath = "./rgb_image.bmp";  
-    string outputPath = "./Grayscale_image_sequential.bmp";
+    const char* infile = "./rgb_image.bmp";  
+    const char* outfile = "./Grayscale_image_sequential.bmp";  
 
-    ifstream imageFile(imagePath, ios::binary);
-    if (!imageFile) {
-        cerr << "Error: Could not open the image file!" << endl;
-        return -1;
+    ifstream in(infile, ios::binary);
+    ofstream out(outfile, ios::binary);
+
+    if (!in || !out) {
+        cerr << "Error: Unable to open files.\n";
+        return 1;
     }
 
-    vector<unsigned char> fileHeader(14);
-    vector<unsigned char> dibHeader(40);
-    imageFile.read(reinterpret_cast<char*>(fileHeader.data()), 14);
-    imageFile.read(reinterpret_cast<char*>(dibHeader.data()), 40);
+    char Header[54];
+    in.read(Header, sizeof(Header));
+    out.write(Header, sizeof(Header));
 
-    int width = *reinterpret_cast<int*>(&dibHeader[4]);
-    int height = *reinterpret_cast<int*>(&dibHeader[8]);
-    short bitDepth = *reinterpret_cast<short*>(&dibHeader[14]);
+    in.seekg(0, ios::end);
+    size_t fileSize = in.tellg();
+    in.seekg(54, ios::beg);  
 
-    if (bitDepth != 24) {
-        cerr << "Error: Only 24-bit BMP files are supported!" << endl;
-        return -1;
+    size_t pixelCount = (fileSize - 54) / sizeof(Pixel);
+    Pixel* pixels = (Pixel*)malloc(pixelCount * sizeof(Pixel));
+
+    if (!pixels) {
+        cerr << "Error: Memory allocation failed.\n";
+        return 1;
     }
 
-    int rowSize = (width * 3 + 3) & ~3;
-    vector<unsigned char> pixelData(rowSize * abs(height));
+    in.read(reinterpret_cast<char*>(pixels), pixelCount * sizeof(Pixel));
+    in.close();
 
-    imageFile.read(reinterpret_cast<char*>(pixelData.data()), pixelData.size());
-    imageFile.close();
+    auto start = chrono::high_resolution_clock::now();
 
-    auto startTime = chrono::high_resolution_clock::now();
-
-    for (int i = 0; i < pixelData.size(); i += 3) {
-        unsigned char b = pixelData[i];
-        unsigned char g = pixelData[i + 1];
-        unsigned char r = pixelData[i + 2];
-        unsigned char gray = RGBtoGRAY(r, g, b);
-        pixelData[i] = pixelData[i + 1] = pixelData[i + 2] = gray;
+    for (size_t i = 0; i < pixelCount; i++) {
+        uint8_t gray = static_cast<uint8_t>(0.299 * pixels[i].r + 0.587 * pixels[i].g + 0.114 * pixels[i].b);
+        pixels[i].r = pixels[i].g = pixels[i].b = gray;
     }
 
-    auto endTime = chrono::high_resolution_clock::now();
-    auto totalTime = chrono::duration_cast<chrono::milliseconds>(endTime - startTime);
-    cout << "Total time: " << totalTime.count() << " ms (Sequential)" << endl;
+    auto end = chrono::high_resolution_clock::now();
+    auto duration = chrono::duration_cast<chrono::microseconds>(end - start);  
 
-    ofstream outputFile(outputPath, ios::binary);
-    if (!outputFile) {
-        cerr << "Error: Could not save the grayscale image!" << endl;
-        return -1;
-    }
+    out.write(reinterpret_cast<char*>(pixels), pixelCount * sizeof(Pixel));
+    out.close();
 
-    outputFile.write(reinterpret_cast<const char*>(fileHeader.data()), 14);
-    outputFile.write(reinterpret_cast<const char*>(dibHeader.data()), 40);
-    outputFile.write(reinterpret_cast<const char*>(pixelData.data()), pixelData.size());
-    outputFile.close();
+    free(pixels);
 
-    cout << "Grayscale image saved to: " << outputPath << endl;
+    cout << "Total time: " << duration.count() << " microseconds (Sequential)" << endl;
+    cout << "Grayscale image saved as " << outfile << endl;
+
     return 0;
 }
