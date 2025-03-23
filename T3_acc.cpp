@@ -28,7 +28,7 @@ int main() {
 
     in.seekg(0, ios::end);
     size_t fileSize = in.tellg();
-    in.seekg(54, ios::beg);  // Skip header
+    in.seekg(54, ios::beg);  
 
     size_t pixelCount = (fileSize - 54) / sizeof(Pixel);
     Pixel* pixels = (Pixel*)malloc(pixelCount * sizeof(Pixel));
