@@ -28,7 +28,7 @@ int main() {
 
     in.seekg(0, ios::end);
     size_t fileSize = in.tellg();
-    in.seekg(54, ios::beg);  
+    in.seekg(54, ios::beg); 
 
     size_t pixelCount = (fileSize - 54) / sizeof(Pixel);
     Pixel* pixels = (Pixel*)malloc(pixelCount * sizeof(Pixel));
@@ -43,9 +43,9 @@ int main() {
 
     auto start = chrono::high_resolution_clock::now();
 
-    for (size_t i = 0; i < pixelCount; i++) {
-        uint8_t gray = static_cast<uint8_t>(0.299 * pixels[i].r + 0.587 * pixels[i].g + 0.114 * pixels[i].b);
-        pixels[i].r = pixels[i].g = pixels[i].b = gray;
+    for (size_t x = 0; x < pixelCount; x++) {
+        int lum = static_cast<int>(pixels[x].r * 0.30 + pixels[x].g * 0.59 + pixels[x].b * 0.11);
+        pixels[x].r = pixels[x].g = pixels[x].b = lum;
     }
 
     auto end = chrono::high_resolution_clock::now();
