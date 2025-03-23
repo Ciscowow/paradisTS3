@@ -7,7 +7,7 @@
 using namespace std;
 
 struct Pixel {
-    unsigned char b, g, r;
+    unsigned char r, g, b;
 };
 
 int main() {
@@ -29,8 +29,8 @@ int main() {
     in.seekg(0, ios::end);
     size_t fileSize = in.tellg();
     in.seekg(54, ios::beg);  
-
     size_t pixelCount = (fileSize - 54) / sizeof(Pixel);
+    
     Pixel* pixels = (Pixel*)malloc(pixelCount * sizeof(Pixel));
 
     if (!pixels) {
