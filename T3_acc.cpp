@@ -1,64 +1,77 @@
 #include <iostream>
-#include <vector>
+#include <fstream>
+#include <cstdint>
 #include <chrono>
-#define STB_IMAGE_IMPLEMENTATION
-#include "stb_image.h"
-#define STB_IMAGE_WRITE_IMPLEMENTATION
-#include "stb_image_write.h"
+#include <cstdlib>  // For malloc/free
 
 using namespace std;
-using namespace std::chrono;
 
-// Convert RGB to Grayscale
-unsigned char RGBtoGRAY(unsigned char r, unsigned char g, unsigned char b) {
-    return static_cast<unsigned char>(0.299 * r + 0.587 * g + 0.114 * b);  // Standard grayscale conversion
-}
+struct Pixel {
+    unsigned char b, g, r;
+};
 
 int main() {
-    string imagePath = "./rgb_image.bmp";  // Path to the input image
-    string outputPath = "./Grayscale_image_parallel.bmp";  // Path to save the grayscale image
+    const char* infile = "./rgb_image.bmp";  // Input BMP image
+    const char* outfile = "./Grayscale_image_parallel.bmp";  // Output grayscale BMP
 
-    int width, height, channels;
+    ifstream in(infile, ios::binary);
+    ofstream out(outfile, ios::binary);
 
-    // Load the image
-    unsigned char* image = stbi_load(imagePath.c_str(), &width, &height, &channels, 3);
-    if (!image) {
-        cerr << "Error: Could not load image!" << endl;
+    if (!in || !out) {
+        cerr << "Error: Unable to open files.\n";
         return 1;
     }
 
-    // Create a vector to hold grayscale pixel data
-    vector<unsigned char> grayImage(width * height);
+    // Read BMP Header (keep on CPU)
+    char Header[54];
+    in.read(Header, sizeof(Header));
+    out.write(Header, sizeof(Header));
 
-    // Start measuring time
-    auto startTime = high_resolution_clock::now();
+    // Get file size and compute pixel count
+    in.seekg(0, ios::end);
+    size_t fileSize = in.tellg();
+    in.seekg(54, ios::beg);  // Skip header
 
-    // Convert each pixel to grayscale in parallel
-    #pragma omp parallel for
-    for (int i = 0; i < width * height; i++) {
-        int index = i * 3;
-        unsigned char r = image[index];
-        unsigned char g = image[index + 1];
-        unsigned char b = image[index + 2];
-        unsigned char gray = RGBtoGRAY(r, g, b);
-        grayImage[i] = gray;
-    }
+    size_t pixelCount = (fileSize - 54) / sizeof(Pixel);
+    Pixel* pixels = (Pixel*)malloc(pixelCount * sizeof(Pixel));
 
-    // End measuring time
-    auto endTime = high_resolution_clock::now();
-    auto totalTime = duration_cast<chrono::milliseconds>(endTime - startTime);
-    cout << "Total time: " << totalTime.count() << " ms (Parallel)" << endl;
-
-    // Save the grayscale image
-    if (!stbi_write_bmp(outputPath.c_str(), width, height, 1, grayImage.data())) {
-        cerr << "Error: Could not save grayscale image!" << endl;
-        stbi_image_free(image);
+    if (!pixels) {
+        cerr << "Error: Memory allocation failed.\n";
         return 1;
     }
 
-    stbi_image_free(image);
+    // Read pixel data
+    in.read(reinterpret_cast<char*>(pixels), pixelCount * sizeof(Pixel));
+    in.close();
 
-    cout << "Grayscale image saved as " << outputPath << endl;
+    // Transfer pixel data to GPU
+    #pragma acc enter data copyin(pixels[0:pixelCount])
+
+    auto start = chrono::high_resolution_clock::now();
+
+    // OpenACC Parallel Grayscale Conversion
+    #pragma acc parallel loop present(pixels[0:pixelCount])
+    for (size_t i = 0; i < pixelCount; i++) {
+        uint8_t gray = static_cast<uint8_t>(0.299 * pixels[i].r + 0.587 * pixels[i].g + 0.114 * pixels[i].b);
+        pixels[i].r = pixels[i].g = pixels[i].b = gray;
+    }
+
+    auto end = chrono::high_resolution_clock::now();
+
+    // Copy data back from GPU
+    #pragma acc exit data copyout(pixels[0:pixelCount])
+
+    auto duration = chrono::duration_cast<chrono::microseconds>(end - start);  // Now in MICROSECONDS
+
+    // Write modified pixel data
+    out.write(reinterpret_cast<char*>(pixels), pixelCount * sizeof(Pixel));
+    out.close();
+
+    // Free allocated memory
+    free(pixels);
+
+    cout << "Total time: " << duration.count() << " microseconds (Parallel)" << endl;
+    cout << "Grayscale image saved as " << outfile << endl;
 
     return 0;
 }
