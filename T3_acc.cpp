@@ -56,12 +56,13 @@ int main() {
     #pragma acc exit data copyout(pixels[0:pixelCount])
 
     auto duration = chrono::duration_cast<chrono::microseconds>(end - start);  
+
     out.write(reinterpret_cast<char*>(pixels), pixelCount * sizeof(Pixel));
     out.close();
 
     free(pixels);
 
-    cout << "Total time: " << duration.count() << " microseconds (Parallel)" << endl;
+    cout << "Grayscale conversion time: " << duration.count() << " microseconds (Parallel)" << endl;
     cout << "Grayscale image saved as " << outfile << endl;
 
     return 0;
