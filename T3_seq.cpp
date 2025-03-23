@@ -4,8 +4,6 @@
 #include <chrono> 
 
 using namespace std;
-
-// Convert RGB to Grayscale
 unsigned char RGBtoGRAY(unsigned char r, unsigned char g, unsigned char b) {
     return static_cast<unsigned char>(0.299 * r + 0.587 * g + 0.114 * b);
 }
@@ -14,14 +12,12 @@ int main() {
     string imagePath = "./rgb_image.bmp";  
     string outputPath = "./Grayscale_image_sequential.bmp";
 
-    // Open the image file
     ifstream imageFile(imagePath, ios::binary);
     if (!imageFile) {
         cerr << "Error: Could not open the image file!" << endl;
         return -1;
     }
 
-    // Read BMP headers
     vector<unsigned char> fileHeader(14);
     vector<unsigned char> dibHeader(40);
     imageFile.read(reinterpret_cast<char*>(fileHeader.data()), 14);
@@ -42,10 +38,8 @@ int main() {
     imageFile.read(reinterpret_cast<char*>(pixelData.data()), pixelData.size());
     imageFile.close();
 
-    // Start measuring time
     auto startTime = chrono::high_resolution_clock::now();
 
-    // Convert to grayscale
     for (int i = 0; i < pixelData.size(); i += 3) {
         unsigned char b = pixelData[i];
         unsigned char g = pixelData[i + 1];
@@ -54,12 +48,10 @@ int main() {
         pixelData[i] = pixelData[i + 1] = pixelData[i + 2] = gray;
     }
 
-    // End measuring time
     auto endTime = chrono::high_resolution_clock::now();
     auto totalTime = chrono::duration_cast<chrono::milliseconds>(endTime - startTime);
     cout << "Total time: " << totalTime.count() << " ms (Sequential)" << endl;
 
-    // Write grayscale image
     ofstream outputFile(outputPath, ios::binary);
     if (!outputFile) {
         cerr << "Error: Could not save the grayscale image!" << endl;
